@@ -1,7 +1,7 @@
 # ========================= main.py =========================
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, HttpUrl
 from typing import List
 import os, logging, requests
 from io import BytesIO
@@ -10,7 +10,7 @@ from pinecone import Pinecone
 from utils.onnx_clip import fclip
 from utils.labels import fashion_tags_kr, fashion_tags_en
 # from tasks import embed_and_tag, embed_and_tag_sync
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, ConfigDict, HttpUrl
 from typing import List, Optional
 from celery.result import AsyncResult          # ⚡ NEW
 from tasks import _encode_image_to_vec, _auto_tag, _upsert_to_index, _fetch_image
@@ -35,7 +35,7 @@ class UploadReq(BaseModel):
     tags: Optional[List[TagItem]] = None
     
     class Config:
-        allow_population_by_field_name = True  # ✅ 이게 없으면 alias만 보고 필드명을 무시함
+         model_config = ConfigDict(populate_by_name=True) # ✅ 이게 없으면 alias만 보고 필드명을 무시함
 
 class SearchReq(BaseModel):
     query: str
