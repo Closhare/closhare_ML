@@ -61,11 +61,13 @@ jobs:
           REDIS_URL=${{ secrets.REDIS_URL }}
           PINECONE_ENV=${{ secrets.PINECONE_ENV }}
           EOF
-
+          
+      - name: 🏗️ Build Docker images
+        run: docker compose build
+      
       - name: 🚀 Deploy with docker-compose
         run: |
           docker compose down --remove-orphans || true
-          docker compose pull
           docker compose up -d
 
       - name: 🧹 Image GC
