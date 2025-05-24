@@ -40,7 +40,10 @@ jobs:
       - name: 📥 Checkout repo
         uses: actions/checkout@v4
 
-      # 1) 최신 이미지 확인 & Pull
+      - name: 🔑 Docker Hub Login
+        run: |
+          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
       - name: 📥 Docker Pull (if not exists)
         run: |
           IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/closhare_inference:latest
@@ -50,11 +53,6 @@ jobs:
           else
             echo "✅ Image already exists. Skipping pull."
           fi
-          
-      - name: 🔍 Debug current directory
-        run: |
-          echo "PWD: $(pwd)"
-          ls -al
 
       - name: 📝 Write .env file
         run: |
@@ -64,13 +62,11 @@ jobs:
           PINECONE_ENV=${{ secrets.PINECONE_ENV }}
           EOF
 
-      # 2) docker compose 스택 재배포
       - name: 🚀 Deploy with docker-compose
         run: |
           docker compose down --remove-orphans || true
           docker compose pull
           docker compose up -d
 
-      # 3) 이미지 정리
       - name: 🧹 Image GC
         run: docker image prune -f
