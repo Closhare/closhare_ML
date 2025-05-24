@@ -2,10 +2,11 @@
 
 fastapi
 uvicorn[standard]
+numpy==1.26.4
 onnxruntime==1.17.1
-optimum
 onnx
-numpy
+torch>=2.0.0,<2.8.0
+optimum
 Pillow
 transformers
 pinecone
