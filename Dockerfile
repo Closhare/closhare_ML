@@ -1,7 +1,7 @@
 FROM python:3.11-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
-    C_FORCE_ROOT=1          # ↔ Celery root 실행 허용
+    C_FORCE_ROOT=1        
 
 WORKDIR /app
 COPY requirements.txt .
