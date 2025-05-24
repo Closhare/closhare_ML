@@ -1,0 +1,15 @@
+# ========================= requirements.txt =========================
+
+fastapi
+uvicorn[standard]
+onnxruntime==1.17.1
+optimum
+onnx
+numpy
+Pillow
+transformers
+pinecone-client
+python-dotenv
+celery
+redis
+requests
