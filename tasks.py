@@ -16,7 +16,7 @@ from utils.onnx_clip import fclip
 from utils.labels import fashion_tags_kr
 import asyncio 
 from typing import List, Optional
-from fastapi import logger
+# from fastapi import logger
 
 # ────────────────────────────────────────────────
 # ─────────────── Celery & Pinecone ──────────────
@@ -133,7 +133,6 @@ def _upsert(product_id: int, vector, metadata: Dict):
 )
 def embed_and_tag(self, product_id: int, img_url: str, tags: List[dict] | None = None):
     try:
-        logger.info(f"[TASK] start id={product_id}")
         image = asyncio.run(_fetch_image(img_url))
         vector = _encode_image_to_vec(image)
         auto_tags = _auto_tag(vector)
@@ -145,9 +144,7 @@ def embed_and_tag(self, product_id: int, img_url: str, tags: List[dict] | None =
             "categories": [t["category"] for t in (tags or [])],
         }
         resp = index.upsert([{"id": str(product_id), "values": vector.tolist(), "metadata": metadata}])
-        logger.info(f"[TASK] upsert resp={resp} id={product_id}")
 
         return {"status": "success", "tags": auto_tags}
     except Exception as exc:
-        logger.error(f"[TASK] fail id={product_id} err={exc}")
         raise self.retry(exc=exc, countdown=5)
