@@ -23,3 +23,4 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"          # 외부 공개가 필요 없으면 지워도 됨
+ 
