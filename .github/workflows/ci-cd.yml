@@ -50,6 +50,11 @@ jobs:
           else
             echo "✅ Image already exists. Skipping pull."
           fi
+          
+      - name: 🔍 Debug current directory
+        run: |
+          echo "PWD: $(pwd)"
+          ls -al
 
       # 2) docker compose 스택 재배포
       - name: 🚀 Deploy with docker-compose
