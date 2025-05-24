@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# 기본 실행은 FastAPI 서버.
-# → docker-compose 에서 worker 서비스만 command 로 덮어씌움
+RUN mkdir -p models \
+ && gdown --folder --id 17tnfnHUU4UlTM4CFuom1A5cF8AeLHdWe -O models
+
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
