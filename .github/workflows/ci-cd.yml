@@ -25,11 +25,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: 🛠️ Build & Push Image
-        run: |
-          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/closhare_inference:latest
-          docker build -t $IMAGE .
-          docker push $IMAGE
+      # - name: 🛠️ Build & Push Image
+      #   run: |
+      #     IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/closhare_inference:latest
+      #     docker build -t $IMAGE .
+      #     docker push $IMAGE
 
 # ────────────────────── 2) EC2에서 교체 실행 ──────────────────────
   deploy-on-ec2:
@@ -61,14 +61,19 @@ jobs:
           REDIS_URL=${{ secrets.REDIS_URL }}
           PINECONE_ENV=${{ secrets.PINECONE_ENV }}
           EOF
-          
+
+      - name: 🧹 Pre-clean Docker disk
+        run: |
+          echo "🧼 Cleaning up Docker system storage..."
+          sudo docker system prune -a --volumes -f
+
       - name: 🏗️ Build Docker images
         run: docker compose build
-      
+
       - name: 🚀 Deploy with docker-compose
         run: |
           docker compose down --remove-orphans || true
           docker compose up -d
 
-      - name: 🧹 Image GC
+      - name: 🧹 Image GC (Post-deploy)
         run: docker image prune -f
