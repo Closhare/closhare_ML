@@ -34,21 +34,39 @@ jobs:
 # ────────────────────── 2) EC2에서 교체 실행 ──────────────────────
   deploy-on-ec2:
     needs: build-push-image
-    runs-on: self-hosted            # EC2 러너
+    runs-on: self-hosted  # EC2 러너
 
     steps:
-      # 1) 최신 이미지 당겨오기
-      - name: 📥 Docker Pull
-        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/closhare_inference:latest
+      - name: 📥 Checkout repo
+        uses: actions/checkout@v4
 
-      # 2) compose 스택 교체
+      - name: 🔑 Docker Hub Login
+        run: |
+          echo "${{ secrets.DOCKERHUB_PASSWORD }}" | sudo docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: 📥 Docker Pull (if not exists)
+        run: |
+          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/closhare_inference:latest
+          if ! sudo docker image inspect $IMAGE > /dev/null 2>&1; then
+            echo "📦 Image not found locally. Pulling..."
+            sudo docker pull $IMAGE
+          else
+            echo "✅ Image already exists. Skipping pull."
+          fi
+
+      - name: 📝 Write .env file
+        run: |
+          cat <<EOF > .env
+          API_KEY=${{ secrets.API_KEY }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          PINECONE_ENV=${{ secrets.PINECONE_ENV }}
+          EOF
+
       - name: 🚀 Deploy with docker-compose
         run: |
-          cd /home/ec2-user/closhare          # compose.yml 이 있는 폴더로 수정
           docker compose down --remove-orphans || true
-          docker compose pull                 # 이미지 태그 변경 시 갱신
+          docker compose pull
           docker compose up -d
 
-      # 3) 누수 이미지 정리
       - name: 🧹 Image GC
         run: docker image prune -f
