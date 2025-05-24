@@ -25,11 +25,11 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: 🛠️ Build & Push Image
-        run: |
-          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/closhare_inference:latest
-          docker build -t $IMAGE .
-          docker push $IMAGE
+      # - name: 🛠️ Build & Push Image
+      #   run: |
+      #     IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/closhare_inference:latest
+      #     docker build -t $IMAGE .
+      #     docker push $IMAGE
 
 # ────────────────────── 2) EC2에서 교체 실행 ──────────────────────
   deploy-on-ec2:
@@ -39,7 +39,7 @@ jobs:
     steps:
       # 1) 최신 이미지 당겨오기
       - name: 📥 Docker Pull
-        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/closhare_inference:latest
+        run: sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/closhare_inference:latest
 
       # 2) compose 스택 교체
       - name: 🚀 Deploy with docker-compose
