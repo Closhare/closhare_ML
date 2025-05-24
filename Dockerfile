@@ -1,5 +1,3 @@
-# ============================ Dockerfile ============================
-# 베이스 이미지는 슬림 + PIP 캐시 제거
 FROM python:3.11-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
