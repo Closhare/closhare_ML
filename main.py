@@ -33,6 +33,9 @@ class UploadReq(BaseModel):
     product_id: int = Field(..., alias="productId")
     img_url: HttpUrl = Field(..., alias="imgUrl")
     tags: Optional[List[TagItem]] = None
+    
+    class Config:
+        allow_population_by_field_name = True  # ✅ 이게 없으면 alias만 보고 필드명을 무시함
 
 class SearchReq(BaseModel):
     query: str
