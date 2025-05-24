@@ -1,10 +1,9 @@
-# ========================= docker-compose.yml =========================
 version: "3.9"
 
 services:
   api:
     build: .
-    image: yulleta/inference:latest      # GitHub Actions가 덮어씀
+    image: yulleta/inference:latest
     env_file: .env
     ports:
       - "5000:5000"
@@ -12,6 +11,7 @@ services:
       - redis
 
   worker:
+    build: .
     image: yulleta/inference:latest
     env_file: .env
     command: celery -A tasks.celery_app worker --loglevel=info
@@ -22,5 +22,4 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"          # 외부 공개가 필요 없으면 지워도 됨
- 
+      - "6379:6379"
