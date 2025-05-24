@@ -56,6 +56,14 @@ jobs:
           echo "PWD: $(pwd)"
           ls -al
 
+      - name: 📝 Write .env file
+        run: |
+          cat <<EOF > .env
+          API_KEY=${{ secrets.API_KEY }}
+          REDIS_URL=${{ secrets.REDIS_URL }}
+          PINECONE_ENV=${{ secrets.PINECONE_ENV }}
+          EOF
+
       # 2) docker compose 스택 재배포
       - name: 🚀 Deploy with docker-compose
         run: |
