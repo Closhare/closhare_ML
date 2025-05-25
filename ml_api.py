@@ -15,6 +15,7 @@ import requests
 from io import BytesIO
 import json
 import uuid
+from utils.onnx_clip import fclip
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -26,7 +27,7 @@ index = pc.Index("closhare")  # 반드시 vector 차원이 맞아야 함
 tag_index = pc.Index("closhare-tags")  # 태그용 인덱스
 
 # Load the FashionCLIP model
-fclip = FashionCLIP("fashion-clip")
+# fclip = FashionCLIP("fashion-clip")
 
 # Fashion-related tags for similarity matching
 # fashion_tags = {

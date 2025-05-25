@@ -27,75 +27,10 @@ pc = Pinecone(api_key=os.getenv("API_KEY"), environment="us-east-1")
 index = pc.Index("closhare")
 tag_index = pc.Index("closhare-tags")
 
-# --------------------------- Schemas ---------------------------
-
-# class TagItem(BaseModel):
-#     tag: str
-#     category: str
-
-# class UploadReq(BaseModel):
-#     product_id: int = Field(..., alias="productId")
-#     img_url: HttpUrl = Field(..., alias="imgUrl")
-#     tags: Optional[List[TagItem]] = None
-    
-#     class Config:
-#          model_config = ConfigDict(populate_by_name=True) # ✅ 이게 없으면 alias만 보고 필드명을 무시함
-
-# class SearchReq(BaseModel):
-#     query: str
-#     top_k: int = 15
-
-# class SearchImgReq(BaseModel):
-#     image_url: str
-#     top_k: int = 15
-
-# class TagReq(BaseModel):
-#     img_url: str = Field(..., alias="img_url")
-
-# class SearchRecReq(BaseModel):
-#     query: str
-#     top_k: int = 15
-
 # --------------------------- Routes ---------------------------
 @app.get("/healthz")
 def health():
     return {"status": "ok"}
-
-# ---------- sync upload (embed + tag + upsert) --------------- 
-# @app.post("/upload", status_code=200)
-# async def upload(req: UploadReq):
-#     """
-#     이미지 1장 업로드 → 임베딩 · 태깅 · Pinecone 업서트까지
-#     모두 직접 처리해서 즉시 완료 결과 반환.
-#     """
-#     try:
-#         # tag_payload = (
-#         #     [t.dict(by_alias=True) for t in req.tags]
-#         #     if req.tags else None
-#         # )
-
-#         print(f">>> SYNC TASK START for product_id={req.product_id}")
-#         image = await _fetch_image(str(req.img_url)) 
-#         vector = _encode_image_to_vec(image)
-
-#         auto_tags = _auto_tag(vector)
-#         print(f">>> AUTO TAGS: {auto_tags}")
-
-#         metadata = {
-#             "tag_inputs": [t.tag for t in req.tags] if req.tags else [],
-#             "categories": [t.category for t in req.tags] if req.tags else [],
-#             "imgUrl": str(req.img_url)
-#         }
-
-#         print(f">>> UPSERTING to Pinecone for product_id={req.product_id}")
-#         _upsert_to_index(req.product_id, vector, metadata)
-
-#         return {"status": "success", "tags": auto_tags}
-#     except Exception as e:
-#         import traceback
-#         traceback.print_exc()
-#         raise HTTPException(status_code=500, detail=f"ML 태깅 실패: {e}")
-
 
 async def get_body_safe(request: Request) -> dict:
     try:
@@ -132,21 +67,24 @@ async def get_body_safe(request: Request) -> dict:
 @app.post("/upload", status_code=status.HTTP_202_ACCEPTED)
 async def upload(request: Request):
     try:
-        body = await get_body_safe(request)
-        product_id = body.get("productId") or body.get("product_id")
-        img_url = body.get("imgUrl") or body.get("img_url")
-        tags = body.get("tags")
+        data = await request.json()  # Flask의 request.get_json()과 동일한 역할
 
-        if not product_id or not img_url:
-            raise HTTPException(status_code=400, detail="Missing productId or imgUrl")
+        img_url = data.get("imgUrl")
+        tag_data = data.get("tags")
+        product_id = data.get("productId")
 
-        task = embed_and_tag.delay(product_id, str(img_url), tags)
+        if not img_url or not tag_data or not product_id:
+            raise HTTPException(status_code=400, detail="imgUrl, tags, or productId missing")
+
+        # 여기에 비동기 태스크 큐 enqueue (예: Celery)
+        task = embed_and_tag.delay(product_id, img_url, tag_data)
+
         return {"status": "queued", "task_id": task.id}
 
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"task_enqueue_failed: {type(e).__name__} - {e}")
-
+    
 # ----------- [2] 작업 상태/결과 조회 -------------------------------- ⚡
 @app.get("/tasks/{task_id}")
 def get_task_status(task_id: str):
@@ -166,8 +104,8 @@ def get_task_status(task_id: str):
 @app.post("/tags")
 async def tags(request: Request):
     try:
-        body = await get_body_safe(request)
-        img_url = body.get("img_url") or body.get("imgUrl")
+        data = await request.json()
+        img_url = data.get("img_url")
 
         if not img_url:
             raise HTTPException(status_code=400, detail="Missing img_url")
@@ -197,9 +135,9 @@ async def tags(request: Request):
 @app.post("/search")
 async def search(request: Request):
     try:
-        body = await get_body_safe(request)
-        query = body.get("query")
-        top_k = body.get("top_k", 15)
+        data = await request.json()
+        query = data.get("query")
+        top_k = data.get("top_k", 15)
 
         if not query:
             return {"status": "400", "code": "missing_query", "results": []}
@@ -207,6 +145,7 @@ async def search(request: Request):
         vec = fclip.encode_text([query])[0]
         qr = index.query(vector=vec.tolist(), top_k=top_k, include_metadata=False)
         ids = [int(m["id"]) for m in qr.get("matches", []) if m.get("id", "").isdigit()]
+        print(f"Search query: {query}, Top K: {top_k}, Results: {ids}")
 
         return {"status": "200", "code": "ok", "results": ids}
 
@@ -218,9 +157,9 @@ async def search(request: Request):
 @app.post("/search-by-image")
 async def search_by_image(request: Request):
     try:
-        body = await get_body_safe(request)
-        image_url = body.get("image_url") or body.get("imageUrl")
-        top_k = body.get("top_k") or body.get("topK") or 15
+        data = await request.json()
+        image_url = data.get("image_url")
+        top_k = data.get("top_k", 15)
 
         if not image_url:
             return {"status": "400", "code": "missing_image_url", "results": []}
@@ -243,9 +182,9 @@ async def search_by_image(request: Request):
 @app.post("/search-recommend")
 async def search_recommend(request: Request):
     try:
-        body = await get_body_safe(request)
-        query = body.get("query", "").strip()
-        top_k = body.get("top_k", 15)
+        data = await request.json()
+        query = data.get("query")  # 예: "봄/스웨터/캐주얼"
+        top_k = data.get("top_k", 15)
 
         if not query:
             return {"status": "400", "code": "missing_query", "results": []}
