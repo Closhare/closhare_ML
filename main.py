@@ -1,6 +1,6 @@
 # ========================= main.py =========================
 
-from fastapi import FastAPI, BackgroundTasks, HTTPException, status
+from fastapi import FastAPI, BackgroundTasks, HTTPException, status, Body
 from pydantic import BaseModel, Field, ConfigDict, HttpUrl
 from typing import List
 import os, logging, requests
@@ -94,7 +94,7 @@ def health():
 
 # ----------- [1] 이미지 업로드 → 작업만 큐에 넣고 202 반환 ----------- ⚡
 @app.post("/upload", status_code=status.HTTP_202_ACCEPTED)
-async def upload(req: UploadReq):
+def upload(req: UploadReq = Body(...)):
     """
     이미지 1장 업로드 → Celery 비동기 작업 큐에 등록만 하고 즉시 202 Accepted.
     결과는 /tasks/{task_id} 엔드포인트로 폴링한다.
