@@ -32,43 +32,13 @@ tag_index = pc.Index("closhare-tags")
 def health():
     return {"status": "ok"}
 
-async def get_body_safe(request: Request) -> dict:
-    try:
-        data = await request.json()
-    except Exception:
-        raw = await request.body()
-        if not raw:
-            raise HTTPException(status_code=400, detail="Request body is empty.")
-        try:
-            data = json.loads(raw.decode("utf-8"))
-        except json.JSONDecodeError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
-
-    # camelCase → snake_case 변환 함수
-    def camel_to_snake(s: str) -> str:
-        s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', s)
-        return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
-
-    # dict일 경우: snake_case key도 함께 제공 (원본 유지)
-    if isinstance(data, dict):
-        normalized = {}
-        for k, v in data.items():
-            normalized[k] = v
-            snake_k = camel_to_snake(k)
-            if snake_k not in normalized:
-                normalized[snake_k] = v
-        return normalized
-
-    return data
-
-
 
 # ----------- [1] 이미지 업로드 → 작업만 큐에 넣고 202 반환 ----------- ⚡
 @app.post("/upload", status_code=status.HTTP_202_ACCEPTED)
 async def upload(request: Request):
     try:
-        data = await request.json()  # Flask의 request.get_json()과 동일한 역할
-
+        data = await request.body() # Flask의 request.get_json()과 동일한 역할
+        print(f"Received data: {data}")
         img_url = data.get("imgUrl")
         tag_data = data.get("tags")
         product_id = data.get("productId")
@@ -104,7 +74,8 @@ def get_task_status(task_id: str):
 @app.post("/tags")
 async def tags(request: Request):
     try:
-        data = await request.json()
+        data = await request.body()
+        print(f"Received data: {data}")
         img_url = data.get("img_url")
 
         if not img_url:
@@ -135,7 +106,8 @@ async def tags(request: Request):
 @app.post("/search")
 async def search(request: Request):
     try:
-        data = await request.json()
+        data = await request.body()
+        print(f"Received data: {data}")
         query = data.get("query")
         top_k = data.get("top_k", 15)
 
@@ -157,7 +129,8 @@ async def search(request: Request):
 @app.post("/search-by-image")
 async def search_by_image(request: Request):
     try:
-        data = await request.json()
+        data = await request.body()
+        print(f"Received data: {data}")
         image_url = data.get("image_url")
         top_k = data.get("top_k", 15)
 
@@ -182,7 +155,8 @@ async def search_by_image(request: Request):
 @app.post("/search-recommend")
 async def search_recommend(request: Request):
     try:
-        data = await request.json()
+        data = await request.body()
+        print(f"Received data: {data}")
         query = data.get("query")  # 예: "봄/스웨터/캐주얼"
         top_k = data.get("top_k", 15)
 
@@ -200,6 +174,7 @@ async def search_recommend(request: Request):
         vec = fclip.encode_text([query_text])[0]
         qr = index.query(vector=vec.tolist(), top_k=top_k, include_metadata=False)
         ids = [int(m["id"]) for m in qr.get("matches", []) if m.get("id", "").isdigit()]
+        print(f"Recommend query: {query}, Top K: {top_k}, Results: {ids}")
 
         return {"status": "200", "code": "ok", "results": ids}
 
