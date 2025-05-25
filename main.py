@@ -105,6 +105,7 @@ async def tags(request: Request):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"tagging_failed: {type(exc).__name__} - {exc}")
 
+
 # ----------------------------- /search ------------------------ 
 @app.post("/search")
 async def search(request: Request):
