@@ -15,6 +15,7 @@ from typing import List, Optional
 from celery.result import AsyncResult          # ⚡ NEW
 from tasks import _encode_image_to_vec, _auto_tag, _upsert_to_index, _fetch_image
 from tasks import embed_and_tag                # ⚡ NEW ─ Celery task 호출용
+from fastapi import Request
 
 app = FastAPI(title="CloShare ML API", version="2.0.0")  # ⚡ 버전업
 logger = logging.getLogger("uvicorn.error")
@@ -57,7 +58,7 @@ tag_index = pc.Index("closhare-tags")
 def health():
     return {"status": "ok"}
 
-# ---------- sync upload (embed + tag + upsert) --------------- ✅
+# ---------- sync upload (embed + tag + upsert) --------------- 
 # @app.post("/upload", status_code=200)
 # async def upload(req: UploadReq):
 #     """
@@ -129,7 +130,7 @@ def get_task_status(task_id: str):
     else:
         return {"status": res.state.lower()}
 
-# ----------------------------- /tags -------------------------- ✅
+# ----------------------------- /tags --------------------------  # ✅
 @app.post("/tags")
 async def tags(request: Request):
     try:
@@ -156,7 +157,7 @@ async def tags(request: Request):
         logger.error(f"/tags failed: {exc}")
         raise HTTPException(status_code=500, detail="tagging_failed")
 
-# ----------------------------- /search ------------------------ ✅
+# ----------------------------- /search ------------------------ 
 @app.post("/search")
 async def search(request: Request):
     try:
@@ -177,9 +178,7 @@ async def search(request: Request):
         logger.error(f"/search error: {exc}")
         return {"status": "500", "code": "ml_error", "results": []}
 
-# ------------------------ /search-by-image -------------------- ✅
-from fastapi import Request
-
+# ------------------------ /search-by-image -------------------- 
 @app.post("/search-by-image")
 async def search_by_image(request: Request):
     try:
@@ -205,7 +204,7 @@ async def search_by_image(request: Request):
         logger.error(f"/search-by-image error: {exc}")
         return {"status": "500", "code": "ml_error", "results": []}
 
-# ----------------------- /search-recommend -------------------- ✅
+# ----------------------- /search-recommend -------------------- 
 @app.post("/search-recommend")
 async def search_recommend(request: Request):
     try:
