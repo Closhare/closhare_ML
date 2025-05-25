@@ -98,14 +98,20 @@ def health():
 async def get_body_safe(request: Request):
     try:
         return await request.json()
-    except Exception:
-        raw = await request.body()
-        if not raw:
-            raise HTTPException(status_code=400, detail="Request body is empty.")
+    except Exception as e:
         try:
-            return json.loads(raw.decode("utf-8"))
-        except json.JSONDecodeError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+            raw = await request.body()
+            if not raw:
+                raise HTTPException(status_code=400, detail="Request body is empty.")
+
+            # 🔥 Spring 대응: 한글 깨짐/비표준 인코딩 대응
+            decoded = raw.decode("utf-8-sig", errors="replace")
+            return json.loads(decoded)
+        except json.JSONDecodeError as je:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON: {je}")
+        except Exception as inner_e:
+            raise HTTPException(status_code=500, detail=f"Failed to parse request body: {inner_e}")
+
 
 
 # ----------- [1] 이미지 업로드 → 작업만 큐에 넣고 202 반환 ----------- ⚡
@@ -200,7 +206,7 @@ async def search_by_image(request: Request):
     try:
         body = await get_body_safe(request)
         image_url = body.get("image_url") or body.get("imageUrl")
-        top_k = body.get("top_k", 15)
+        top_k = body.get("top_k") or body.get("topK") or 15
 
         if not image_url:
             return {"status": "400", "code": "missing_image_url", "results": []}
