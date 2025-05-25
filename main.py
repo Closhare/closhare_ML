@@ -17,6 +17,7 @@ from tasks import _encode_image_to_vec, _auto_tag, _upsert_to_index, _fetch_imag
 from tasks import embed_and_tag                # ⚡ NEW ─ Celery task 호출용
 from fastapi import Request
 import traceback  
+import json
 
 app = FastAPI(title="CloShare ML API", version="2.0.0")  # ⚡ 버전업
 logger = logging.getLogger("uvicorn.error")
@@ -94,20 +95,28 @@ def health():
 #         traceback.print_exc()
 #         raise HTTPException(status_code=500, detail=f"ML 태깅 실패: {e}")
 
+def get_body_safe(request: Request):
+    async def inner():
+        try:
+            return await request.json()
+        except:
+            raw = await request.body()
+            return json.loads(raw.decode("utf-8"))
+    return inner()
+
 # ----------- [1] 이미지 업로드 → 작업만 큐에 넣고 202 반환 ----------- ⚡
 @app.post("/upload", status_code=status.HTTP_202_ACCEPTED)
 async def upload(request: Request):
     try:
-        body = await request.json()
-        product_id = body.get("productId")
-        img_url = body.get("imgUrl")
+        body = await get_body_safe(request)
+        product_id = body.get("productId") or body.get("product_id")
+        img_url = body.get("imgUrl") or body.get("img_url")
         tags = body.get("tags")
 
         if not product_id or not img_url:
             raise HTTPException(status_code=400, detail="Missing productId or imgUrl")
 
-        tags_payload = tags if tags else None
-        task = embed_and_tag.delay(product_id, str(img_url), tags_payload)
+        task = embed_and_tag.delay(product_id, str(img_url), tags)
         return {"status": "queued", "task_id": task.id}
 
     except Exception as e:
@@ -133,8 +142,11 @@ def get_task_status(task_id: str):
 @app.post("/tags")
 async def tags(request: Request):
     try:
-        body = await request.json()
-        img_url = body.get("img_url")
+        body = await get_body_safe(request)
+        img_url = body.get("img_url") or body.get("imgUrl")
+
+        if not img_url:
+            raise HTTPException(status_code=400, detail="Missing img_url")
 
         resp = requests.get(img_url, timeout=10)
         resp.raise_for_status()
@@ -155,14 +167,13 @@ async def tags(request: Request):
 
     except Exception as exc:
         traceback.print_exc()
-        logger.error(f"/tags failed: {type(exc).__name__} - {exc}")
         raise HTTPException(status_code=500, detail=f"tagging_failed: {type(exc).__name__} - {exc}")
 
 # ----------------------------- /search ------------------------ 
 @app.post("/search")
 async def search(request: Request):
     try:
-        body = await request.json()
+        body = await get_body_safe(request)
         query = body.get("query")
         top_k = body.get("top_k", 15)
 
@@ -177,15 +188,14 @@ async def search(request: Request):
 
     except Exception as exc:
         traceback.print_exc()
-        logger.error(f"/search error: {type(exc).__name__} - {exc}")
         return {"status": "500", "code": "ml_error", "error": f"{type(exc).__name__} - {exc}", "results": []}
 
 # ------------------------ /search-by-image -------------------- 
 @app.post("/search-by-image")
 async def search_by_image(request: Request):
     try:
-        body = await request.json()
-        image_url = body.get("image_url")
+        body = await get_body_safe(request)
+        image_url = body.get("image_url") or body.get("imageUrl")
         top_k = body.get("top_k", 15)
 
         if not image_url:
@@ -193,7 +203,6 @@ async def search_by_image(request: Request):
 
         resp = requests.get(image_url, timeout=10)
         resp.raise_for_status()
-
         image = Image.open(BytesIO(resp.content)).convert("RGB")
         vec = fclip.encode_images([image])[0]
 
@@ -204,14 +213,13 @@ async def search_by_image(request: Request):
 
     except Exception as exc:
         traceback.print_exc()
-        logger.error(f"/search-by-image error: {type(exc).__name__} - {exc}")
         return {"status": "500", "code": "ml_error", "error": f"{type(exc).__name__} - {exc}", "results": []}
 
 # ----------------------- /search-recommend -------------------- 
 @app.post("/search-recommend")
 async def search_recommend(request: Request):
     try:
-        body = await request.json()
+        body = await get_body_safe(request)
         query = body.get("query", "").strip()
         top_k = body.get("top_k", 15)
 
@@ -226,8 +234,6 @@ async def search_recommend(request: Request):
             return {"status": "400", "code": "no_valid_tags", "results": []}
 
         query_text = " ".join(kw_en)
-        logger.info(f"query_kr: {query}, query_en: {query_text}")
-
         vec = fclip.encode_text([query_text])[0]
         qr = index.query(vector=vec.tolist(), top_k=top_k, include_metadata=False)
         ids = [int(m["id"]) for m in qr.get("matches", []) if m.get("id", "").isdigit()]
@@ -236,7 +242,6 @@ async def search_recommend(request: Request):
 
     except Exception as exc:
         traceback.print_exc()
-        logger.error(f"/search-recommend error: {type(exc).__name__} - {exc}")
         return {"status": "500", "code": "recommend_error", "error": f"{type(exc).__name__} - {exc}", "results": []}
 
 if __name__ == "__main__":
