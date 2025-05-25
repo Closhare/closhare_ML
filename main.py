@@ -76,6 +76,7 @@ def get_task_status(task_id: str):
 async def tags(request: Request):
     try:
         raw_body = await request.body()
+        print(f"Received raw_body : {raw_body }")
         data = json.loads(raw_body)
         print(f"Received data: {data}")
         img_url = data.get("img_url")
@@ -109,6 +110,7 @@ async def tags(request: Request):
 async def search(request: Request):
     try:
         raw_body = await request.body()
+        print(f"Received raw_body : {raw_body }")
         data = json.loads(raw_body)
         print(f"Received data: {data}")
         query = data.get("query")
@@ -133,6 +135,7 @@ async def search(request: Request):
 async def search_by_image(request: Request):
     try:
         raw_body = await request.body()
+        print(f"Received raw_body : {raw_body }")
         data = json.loads(raw_body)
         print(f"Received data: {data}")
         image_url = data.get("image_url")
@@ -160,6 +163,7 @@ async def search_by_image(request: Request):
 async def search_recommend(request: Request):
     try:
         raw_body = await request.body()
+        print(f"Received raw_body : {raw_body }")
         data = json.loads(raw_body)
         print(f"Received data: {data}")
         query = data.get("query")  # 예: "봄/스웨터/캐주얼"
