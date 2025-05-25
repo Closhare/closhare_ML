@@ -37,7 +37,10 @@ def health():
 @app.post("/upload", status_code=status.HTTP_202_ACCEPTED)
 async def upload(request: Request):
     try:
+        headers = dict(request.headers)
         raw_body = await request.body()
+        print(f"[DEBUG] Headers: {headers}")
+        print(f"[DEBUG] Raw Body: {raw_body}")
         data = json.loads(raw_body)
         print(f"Received data: {data}")
         img_url = data.get("imgUrl")
@@ -75,8 +78,10 @@ def get_task_status(task_id: str):
 @app.post("/tags")
 async def tags(request: Request):
     try:
+        headers = dict(request.headers)
         raw_body = await request.body()
-        print(f"Received raw_body : {raw_body }")
+        print(f"[DEBUG] Headers: {headers}")
+        print(f"[DEBUG] Raw Body: {raw_body}")
         data = json.loads(raw_body)
         print(f"Received data: {data}")
         img_url = data.get("img_url")
@@ -110,8 +115,10 @@ async def tags(request: Request):
 @app.post("/search")
 async def search(request: Request):
     try:
+        headers = dict(request.headers)
         raw_body = await request.body()
-        print(f"Received raw_body : {raw_body }")
+        print(f"[DEBUG] Headers: {headers}")
+        print(f"[DEBUG] Raw Body: {raw_body}")
         data = json.loads(raw_body)
         print(f"Received data: {data}")
         query = data.get("query")
@@ -135,8 +142,10 @@ async def search(request: Request):
 @app.post("/search-by-image")
 async def search_by_image(request: Request):
     try:
+        headers = dict(request.headers)
         raw_body = await request.body()
-        print(f"Received raw_body : {raw_body }")
+        print(f"[DEBUG] Headers: {headers}")
+        print(f"[DEBUG] Raw Body: {raw_body}")
         data = json.loads(raw_body)
         print(f"Received data: {data}")
         image_url = data.get("image_url")
@@ -163,8 +172,10 @@ async def search_by_image(request: Request):
 @app.post("/search-recommend")
 async def search_recommend(request: Request):
     try:
+        headers = dict(request.headers)
         raw_body = await request.body()
-        print(f"Received raw_body : {raw_body }")
+        print(f"[DEBUG] Headers: {headers}")
+        print(f"[DEBUG] Raw Body: {raw_body}")
         data = json.loads(raw_body)
         print(f"Received data: {data}")
         query = data.get("query")  # 예: "봄/스웨터/캐주얼"
