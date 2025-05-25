@@ -54,6 +54,11 @@ jobs:
             echo "✅ Image already exists. Skipping pull."
           fi
 
+      - name: 📂 Upload nginx config
+        run: |
+          mkdir -p nginx
+          echo "${{ secrets.NGINX_CONF }}" > nginx/nginx.conf
+
       - name: 📝 Write .env file
         run: |
           cat <<EOF > .env
