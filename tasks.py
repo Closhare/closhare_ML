@@ -140,7 +140,6 @@ def embed_and_tag(self, product_id: int, img_url: str, tags: List[dict] | None =
         metadata = {
             "tags": auto_tags,
             "imgUrl": img_url,
-            "tag_inputs": [t["tag"] for t in (tags or [])],
             "categories": [t["category"] for t in (tags or [])],
         }
         resp = index.upsert([{"id": str(product_id), "values": vector.tolist(), "metadata": metadata}])
