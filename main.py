@@ -95,14 +95,18 @@ def health():
 #         traceback.print_exc()
 #         raise HTTPException(status_code=500, detail=f"ML 태깅 실패: {e}")
 
-def get_body_safe(request: Request):
-    async def inner():
+async def get_body_safe(request: Request):
+    try:
+        return await request.json()
+    except Exception:
+        raw = await request.body()
+        if not raw:
+            raise HTTPException(status_code=400, detail="Request body is empty.")
         try:
-            return await request.json()
-        except:
-            raw = await request.body()
             return json.loads(raw.decode("utf-8"))
-    return inner()
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+
 
 # ----------- [1] 이미지 업로드 → 작업만 큐에 넣고 202 반환 ----------- ⚡
 @app.post("/upload", status_code=status.HTTP_202_ACCEPTED)
