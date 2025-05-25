@@ -1,6 +1,6 @@
 # ========================= main.py =========================
 
-from fastapi import FastAPI, BackgroundTasks, HTTPException, status, Body
+from fastapi import FastAPI, BackgroundTasks, HTTPException, status, Body, Request
 from pydantic import BaseModel, Field, ConfigDict, HttpUrl
 from typing import List
 import os, logging, requests
@@ -25,32 +25,32 @@ tag_index = pc.Index("closhare-tags")
 
 # --------------------------- Schemas ---------------------------
 
-class TagItem(BaseModel):
-    tag: str
-    category: str
+# class TagItem(BaseModel):
+#     tag: str
+#     category: str
 
-class UploadReq(BaseModel):
-    product_id: int = Field(..., alias="productId")
-    img_url: HttpUrl = Field(..., alias="imgUrl")
-    tags: Optional[List[TagItem]] = None
+# class UploadReq(BaseModel):
+#     product_id: int = Field(..., alias="productId")
+#     img_url: HttpUrl = Field(..., alias="imgUrl")
+#     tags: Optional[List[TagItem]] = None
     
-    class Config:
-         model_config = ConfigDict(populate_by_name=True) # ✅ 이게 없으면 alias만 보고 필드명을 무시함
+#     class Config:
+#          model_config = ConfigDict(populate_by_name=True) # ✅ 이게 없으면 alias만 보고 필드명을 무시함
 
-class SearchReq(BaseModel):
-    query: str
-    top_k: int = 15
+# class SearchReq(BaseModel):
+#     query: str
+#     top_k: int = 15
 
-class SearchImgReq(BaseModel):
-    image_url: str
-    top_k: int = 15
+# class SearchImgReq(BaseModel):
+#     image_url: str
+#     top_k: int = 15
 
-class TagReq(BaseModel):
-    img_url: str = Field(..., alias="img_url")
+# class TagReq(BaseModel):
+#     img_url: str = Field(..., alias="img_url")
 
-class SearchRecReq(BaseModel):
-    query: str
-    top_k: int = 15
+# class SearchRecReq(BaseModel):
+#     query: str
+#     top_k: int = 15
 
 # --------------------------- Routes ---------------------------
 @app.get("/healthz")
@@ -94,15 +94,20 @@ def health():
 
 # ----------- [1] 이미지 업로드 → 작업만 큐에 넣고 202 반환 ----------- ⚡
 @app.post("/upload", status_code=status.HTTP_202_ACCEPTED)
-def upload(req: UploadReq = Body(...)):
-    """
-    이미지 1장 업로드 → Celery 비동기 작업 큐에 등록만 하고 즉시 202 Accepted.
-    결과는 /tasks/{task_id} 엔드포인트로 폴링한다.
-    """
+async def upload(request: Request):
+    body = await request.json()
     try:
-        tags_payload = [t.dict() for t in req.tags] if req.tags else None
-        task = embed_and_tag.delay(req.product_id, str(req.img_url), tags_payload)
+        product_id = body.get("productId")
+        img_url = body.get("imgUrl")
+        tags = body.get("tags")
+
+        if not product_id or not img_url:
+            raise HTTPException(status_code=400, detail="Missing productId or imgUrl")
+
+        tags_payload = tags if tags else None
+        task = embed_and_tag.delay(product_id, str(img_url), tags_payload)
         return {"status": "queued", "task_id": task.id}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"task_enqueue_failed: {e}")
 
@@ -126,9 +131,12 @@ def get_task_status(task_id: str):
 
 # ----------------------------- /tags -------------------------- ✅
 @app.post("/tags")
-def tags(req: TagReq):
+async def tags(request: Request):
     try:
-        resp = requests.get(req.img_url, timeout=10)
+        body = await request.json()
+        img_url = body.get("img_url")
+
+        resp = requests.get(img_url, timeout=10)
         resp.raise_for_status()
         image = Image.open(BytesIO(resp.content)).convert("RGB")
         vec = fclip.encode_images([image])[0]
@@ -138,138 +146,95 @@ def tags(req: TagReq):
         for cat in categories:
             tk = 2 if cat == "Fashion Styles" else 1
             qr = tag_index.query(vector=vec.tolist(), top_k=tk, include_metadata=True, filter={"category": {"$eq": cat}})
-            # print(f"Category: {cat}, Top K: {tk}, Matches: {len(qr.get('matches', []))}")
             for m in qr.get("matches", []):
                 raw = m["metadata"].get("tag")
-                print(f"Raw tag: {raw}, Category: {cat}")
                 if raw.strip() in fashion_tags_kr:
                     tag_results.append(fashion_tags_kr[raw])
-                    print("있음")
-                else:
-                    # tag_results.append(raw.strip())
-                    print("없음")
-        return {
-            "status": "success",
-            "results": {
-                "tags": tag_results
-            }
-        }
+        return {"status": "success", "results": {"tags": tag_results}}
 
     except Exception as exc:
-        print(f"Error in /tags: {exc}")
         logger.error(f"/tags failed: {exc}")
         raise HTTPException(status_code=500, detail="tagging_failed")
 
 # ----------------------------- /search ------------------------ ✅
 @app.post("/search")
-def search(req: SearchReq):
+async def search(request: Request):
     try:
-        if not req.query:
-            return {
-                "status": "400",
-                "code": "missing_query",
-                "results": []
-            }
+        body = await request.json()
+        query = body.get("query")
+        top_k = body.get("top_k", 15)
 
-        vec = fclip.encode_text([req.query])[0]
-        qr = index.query(vector=vec.tolist(), top_k=req.top_k, include_metadata=False)
+        if not query:
+            return {"status": "400", "code": "missing_query", "results": []}
+
+        vec = fclip.encode_text([query])[0]
+        qr = index.query(vector=vec.tolist(), top_k=top_k, include_metadata=False)
         ids = [int(m["id"]) for m in qr.get("matches", []) if m.get("id", "").isdigit()]
 
-        return {
-            "status": "200",
-            "code": "ok",
-            "results": ids
-        }
+        return {"status": "200", "code": "ok", "results": ids}
 
     except Exception as exc:
         logger.error(f"/search error: {exc}")
-        return {
-            "status": "500",
-            "code": "ml_error",
-            "results": []
-        }
+        return {"status": "500", "code": "ml_error", "results": []}
 
 # ------------------------ /search-by-image -------------------- ✅
+from fastapi import Request
+
 @app.post("/search-by-image")
-def search_by_image(req: SearchImgReq):
+async def search_by_image(request: Request):
     try:
-        # 이미지 요청 및 벡터화
-        resp = requests.get(req.image_url, timeout=10)
+        body = await request.json()
+        image_url = body.get("image_url")
+        top_k = body.get("top_k", 15)
+
+        if not image_url:
+            return {"status": "400", "code": "missing_image_url", "results": []}
+
+        resp = requests.get(image_url, timeout=10)
         resp.raise_for_status()
 
         image = Image.open(BytesIO(resp.content)).convert("RGB")
         vec = fclip.encode_images([image])[0]
 
-        # 벡터 검색
-        qr = index.query(vector=vec.tolist(), top_k=req.top_k, include_metadata=False)
+        qr = index.query(vector=vec.tolist(), top_k=top_k, include_metadata=False)
         ids = [int(m["id"]) for m in qr.get("matches", []) if m.get("id", "").isdigit()]
 
-        # 정상 응답
-        return {
-            "status": "200",
-            "code": "ok",
-            "results": ids
-        }
+        return {"status": "200", "code": "ok", "results": ids}
 
     except Exception as exc:
         logger.error(f"/search-by-image error: {exc}")
-        return {
-            "status": "500",
-            "code": "ml_error",
-            "results": []
-        }
+        return {"status": "500", "code": "ml_error", "results": []}
 
 # ----------------------- /search-recommend -------------------- ✅
 @app.post("/search-recommend")
-def search_recommend(req: SearchRecReq):
+async def search_recommend(request: Request):
     try:
-        # 1. 입력값 검사
-        if not req.query or not req.query.strip():
-            return {
-                "status": "400",
-                "code": "missing_query",
-                "results": []
-            }
+        body = await request.json()
+        query = body.get("query", "").strip()
+        top_k = body.get("top_k", 15)
 
-        top_k = req.top_k if req.top_k and req.top_k > 0 else 15
+        if not query:
+            return {"status": "400", "code": "missing_query", "results": []}
 
-        # 2. 태그 분리 및 번역
-        kw_kr = [k.strip() for k in req.query.split("/") if k.strip()]
+        kw_kr = [k.strip() for k in query.split("/") if k.strip()]
         kw_en = [fashion_tags_en.get(k, "") for k in kw_kr]
         kw_en = [k for k in kw_en if k]
 
         if not kw_en:
-            return {
-                "status": "400",
-                "code": "no_valid_tags",
-                "results": []
-            }
+            return {"status": "400", "code": "no_valid_tags", "results": []}
 
         query_text = " ".join(kw_en)
-        logger.info(f"query_kr: {req.query}, query_en: {query_text}")
+        logger.info(f"query_kr: {query}, query_en: {query_text}")
 
-        # 3. 벡터화
         vec = fclip.encode_text([query_text])[0]
-
-        # 4. 벡터 검색
         qr = index.query(vector=vec.tolist(), top_k=top_k, include_metadata=False)
         ids = [int(m["id"]) for m in qr.get("matches", []) if m.get("id", "").isdigit()]
 
-        # 5. 성공 응답
-        return {
-            "status": "200",
-            "code": "ok",
-            "results": ids
-        }
+        return {"status": "200", "code": "ok", "results": ids}
 
     except Exception as exc:
         logger.error(f"/search-recommend error: {exc}")
-        return {
-            "status": "500",
-            "code": "recommend_error",
-            "results": []
-        }
-
+        return {"status": "500", "code": "recommend_error", "results": []}
 
 if __name__ == "__main__":
     import uvicorn
