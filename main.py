@@ -95,22 +95,35 @@ def health():
 #         traceback.print_exc()
 #         raise HTTPException(status_code=500, detail=f"ML 태깅 실패: {e}")
 
-async def get_body_safe(request: Request):
-    try:
-        return await request.json()
-    except Exception as e:
-        try:
-            raw = await request.body()
-            if not raw:
-                raise HTTPException(status_code=400, detail="Request body is empty.")
 
-            # 🔥 Spring 대응: 한글 깨짐/비표준 인코딩 대응
-            decoded = raw.decode("utf-8-sig", errors="replace")
-            return json.loads(decoded)
-        except json.JSONDecodeError as je:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON: {je}")
-        except Exception as inner_e:
-            raise HTTPException(status_code=500, detail=f"Failed to parse request body: {inner_e}")
+async def get_body_safe(request: Request) -> dict:
+    try:
+        data = await request.json()
+    except Exception:
+        raw = await request.body()
+        if not raw:
+            raise HTTPException(status_code=400, detail="Request body is empty.")
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+
+    # camelCase → snake_case 변환 함수
+    def camel_to_snake(s: str) -> str:
+        s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', s)
+        return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+    # dict일 경우: snake_case key도 함께 제공 (원본 유지)
+    if isinstance(data, dict):
+        normalized = {}
+        for k, v in data.items():
+            normalized[k] = v
+            snake_k = camel_to_snake(k)
+            if snake_k not in normalized:
+                normalized[snake_k] = v
+        return normalized
+
+    return data
 
 
 
