@@ -18,6 +18,7 @@ from tasks import embed_and_tag                # ⚡ NEW ─ Celery task 호출�
 from fastapi import Request
 import traceback  
 import json
+import re
 
 app = FastAPI(title="CloShare ML API", version="2.0.0")  # ⚡ 버전업
 logger = logging.getLogger("uvicorn.error")
