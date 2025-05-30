@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, ConfigDict, HttpUrl
 from typing import List, Optional
 from celery.result import AsyncResult          # ⚡ NEW
 from tasks import _encode_image_to_vec, _auto_tag, _upsert_to_index, _fetch_image
-from tasks import embed_and_tag, embed_only                # ⚡ NEW ─ Celery task 호출용
+from tasks import embed_only                # ⚡ NEW ─ Celery task 호출용
 from fastapi import Request
 import traceback  
 import json
