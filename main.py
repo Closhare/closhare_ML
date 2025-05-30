@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, ConfigDict, HttpUrl
 from typing import List, Optional
 from celery.result import AsyncResult          # ⚡ NEW
 from tasks import _encode_image_to_vec, _auto_tag, _upsert_to_index, _fetch_image
-from tasks import embed_and_tag                # ⚡ NEW ─ Celery task 호출용
+from tasks import embed_and_tag, embed_only                # ⚡ NEW ─ Celery task 호출용
 from fastapi import Request
 import traceback  
 import json
@@ -51,7 +51,7 @@ async def upload(request: Request):
             raise HTTPException(status_code=400, detail="imgUrl, tags, or productId missing")
 
         # 여기에 비동기 태스크 큐 enqueue (예: Celery)
-        task = embed_and_tag.delay(product_id, img_url, tag_data)
+        task = embed_only.delay(product_id, img_url, tag_data)
 
         return {"status": "queued", "task_id": task.id}
 

@@ -124,26 +124,50 @@ def _upsert(product_id: int, vector, metadata: Dict):
     index.upsert([{"id": str(product_id), "values": vector.tolist(), "metadata": metadata}])
 
 # ─────────────────────── Celery Task (핵심) ───────────────────────
+# @celery_app.task(
+#     name="embed_and_tag",
+#     bind=True,
+#     autoretry_for=(httpx.HTTPError, Exception),
+#     max_retries=3,
+#     retry_backoff=True,
+# )
+# def embed_and_tag(self, product_id: int, img_url: str, tags: List[dict] | None = None):
+#     try:
+#         image = asyncio.run(_fetch_image(img_url))
+#         vector = _encode_image_to_vec(image)
+#         auto_tags = _auto_tag(vector)
+
+#         metadata = {
+#             "tags": auto_tags,
+#             "imgUrl": img_url,
+#             "categories": [t["category"] for t in (tags or [])],
+#         }
+#         resp = index.upsert([{"id": str(product_id), "values": vector.tolist(), "metadata": metadata}])
+
+#         return {"status": "success", "tags": auto_tags}
+#     except Exception as exc:
+#         raise self.retry(exc=exc, countdown=5)
+    
 @celery_app.task(
-    name="embed_and_tag",
+    name="embed_only",
     bind=True,
     autoretry_for=(httpx.HTTPError, Exception),
     max_retries=3,
     retry_backoff=True,
 )
-def embed_and_tag(self, product_id: int, img_url: str, tags: List[dict] | None = None):
-    try:
-        image = asyncio.run(_fetch_image(img_url))
-        vector = _encode_image_to_vec(image)
-        auto_tags = _auto_tag(vector)
+def embed_only(product_id: int, img_url: str, tags: List[dict]):
+    image = asyncio.run(_fetch_image(img_url))
+    vector = _encode_image_to_vec(image)
 
-        metadata = {
-            "tags": auto_tags,
-            "imgUrl": img_url,
-            "categories": [t["category"] for t in (tags or [])],
-        }
-        resp = index.upsert([{"id": str(product_id), "values": vector.tolist(), "metadata": metadata}])
+    metadata = {
+        "tags": [t["tag"] for t in tags],
+        "imgUrl": img_url,
+        "categories": [t["category"] for t in tags],
+    }
 
-        return {"status": "success", "tags": auto_tags}
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=5)
+    index.upsert([{
+        "id": str(product_id),
+        "values": vector.tolist(),
+        "metadata": metadata,
+    }])
+    return {"status": "success", "tags": tags}
