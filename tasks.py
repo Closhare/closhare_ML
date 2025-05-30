@@ -155,7 +155,7 @@ def _upsert(product_id: int, vector, metadata: Dict):
     max_retries=3,
     retry_backoff=True,
 )
-def embed_only(product_id: int, img_url: str, tags: List[dict]):
+def embed_only(self, product_id: int, img_url: str, tags: List[dict] | None = None):
     image = asyncio.run(_fetch_image(img_url))
     vector = _encode_image_to_vec(image)
 
